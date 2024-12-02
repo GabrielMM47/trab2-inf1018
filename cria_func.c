@@ -1,10 +1,10 @@
+/* Gabriel Martins Mendes - 2311271 - Turma 3WC */
+/* Leo Klinger Svartman - 2310862 - Turma 3WC */
+
 #include "cria_func.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-/* Gabriel Martins Mendes - 2311271 - Turma 3WC*/
-/* Leo Klinger Svartman - 2310862 - Turma 3WC*/
 
 void moverdi2rsi(unsigned char* codigo, int* ind){
     // mov %rdi, %rsi
@@ -27,13 +27,17 @@ void moverdi2rdx(unsigned char* codigo, int* ind){
     codigo[(*ind)++] = 0xfa; 
 }
 
-void cria_func(void *f, DescParam params[], int n, unsigned char codigo[]){
+void end2reg(unsigned char* codigo, int* ind, unsigned char* reg, void* end){
+    codigo[(*ind)++] = reg[0];
+    codigo[(*ind)++] = reg[1]; 
+    memcpy(&codigo[*ind], end, sizeof(void *));
+    *ind += sizeof(void *);
+}
 
-    printf("Endereço recebido: %p\n", f);
-    // TA COM BASTANTE COMENTARIO PARA A GENTE NÃO SE PERDER... (DEPOIS TIRAMOS ALGUNS
+void cria_func(void *f, DescParam params[], int n, unsigned char codigo[]){
     int ind = 0;
 
-    //ALINHANDO A PILHA
+    // ALINHANDO A PILHA
     codigo[ind++] = 0x55;
     codigo[ind++] = 0x48;
     codigo[ind++] = 0x89;
@@ -43,195 +47,157 @@ void cria_func(void *f, DescParam params[], int n, unsigned char codigo[]){
     codigo[ind++] = 0xec;
     codigo[ind++] = 0x10;
 
-    codigo[ind++] = 0x48;
-    codigo[ind++] = 0xb8;                     // movabs constante 64bits, r12
-    memcpy(&codigo[ind], &f, sizeof(void *)); // Passa o endereço da função para o código
-    ind += sizeof(void *);
+    // PASSA O ENDEREÇO DA FUNÇÃO QUE SERÁ CHAMADA COM O CALL INDIRETO PARA O CÓDIGO
+    unsigned char mov2rax[] = {0x48,0xb8};
+    end2reg(codigo, &ind, mov2rax, &f);
 
-
-    // tem que ver se está tudo correto, pois quem chama pode não passar todos os parâmetros, o que desalinha 
-    int contaPARAM = 0;
+    // ALINHAMENTO DOS PARAMs PARA OS REGISTRADORES CERTOS 
+    int numPARAM = 0;
     for (int i = 0; i < n; i++){
         if (params[i].orig_val == PARAM)
-            contaPARAM++;
+            numPARAM++;
     }
 
-    if (contaPARAM != n){
+    if (numPARAM != n){
         if (n == 2){
             if (params[0].orig_val != PARAM){
-                // tenho que mover de di para si
+                // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 2º ARGUMENTO
                 moverdi2rsi(codigo, &ind);
             }
         }
 
         if (n == 3){
-            if(contaPARAM == 1){
+            if(numPARAM == 1){
                 if (params[0].orig_val != PARAM){
                     if (params[1].orig_val == PARAM){
-                        // tenho que mover de di para si
+                        // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 2º ARGUMENTO
                         moverdi2rsi(codigo, &ind);
                     }
                     else if (params[2].orig_val == PARAM){
-                        // Movo de rdi para rdx
+                        // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 3º ARGUMENTO
                         moverdi2rdx(codigo, &ind);
                     }
                 }
-                // nao tem else, pois está no lugar certo.
             }
-            else // 2 parametros, 3 não pode pq não é != n
-            {
+
+            else {
                 if (params[0].orig_val != PARAM){
-                    // tenho que shiftar todos para a direita
-                    // fazendo si --> dx primeiro
+                    // MOVER DO REGISTRADOR DE 2º ARGUMENTO PARA O DE 3º ARGUMENTO
                     moversi2rdx(codigo, &ind);
 
-                    // Movo de rdi para rsi
+                    // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 2º ARGUMENTO
                     moverdi2rsi(codigo, &ind);
                 }
+
                 if (params[1].orig_val != PARAM){
-                    // so tenho que mover um, pois significa que o outro ta no lugar certo (di)
+                    // MOVER DO REGISTRADOR DE 2º ARGUMENTO PARA O DE 3º ARGUMENTO
                     moversi2rdx(codigo, &ind);
                 }
             }
         }
     }
 
-    /*
-    n == 2:
+    // DEFININDO OS HEXADECIMAIS REFERENTES A MOVIMENTAÇÃO DE UM VALOR DE 8 BYTES PARA OS REGISTRADORES QUE SERÃO UTILIZADOS ABAIXO
+    // REGISTRADORES DE ARGUMENTOS
+    unsigned char mov2rdi[] = {0x48,0xbf};
+    unsigned char mov2rsi[] = {0x48,0xbe};
+    unsigned char mov2rdx[] = {0x48,0xba};
 
-    Caso (1º FIX, 2º PARAM): Move rdi → rsi. Resolvido.
-    Caso (1º PARAM, 2º FIX): Nenhuma ação necessária. Resolvido.
-
-    n == 3:
-
-    1º FIX, 2º PARAM, 3º FIX: Move rdi → rsi. Resolvido.
-    1º FIX, 2º FIX, 3º PARAM: Move rdi → rdx. Resolvido.
-    1º PARAM, 2º FIX, 3º FIX: Nenhuma ação necessária. Resolvido.
-    1º FIX, 2º FIX, 3º FIX (não há PARAM): Nenhuma ação necessária. Resolvido.
-    1º FIX, 2º PARAM, 3º PARAM:
-        Move rsi → rdx.
-        Move rdi → rsi. Resolvido.
-    1º PARAM, 2º FIX, 3º PARAM:
-        Move rsi → rdx. Resolvido.
-    
-    */
-
-    // copiar todos os parâmetros para os registradores corretos
+    // PASSANDO OS PARÂMETROS DAS FUNÇÕES PARA OS REGISTRADORES REFERENTES AOS ARGUMENTOS CORRETOS
     for (int i = 0; i < n; i++){
         switch (params[i].tipo_val){
         case INT_PAR:
+
             switch (params[i].orig_val){
             case PARAM:
-                // ja estão no lugar certo :)
-                continue;
+            // CASO TRATADO NO PRIMEIRO FOR DA FUNÇÃO 
                 break;
+
             case FIX:
+            // PASSA A CONSTANTE DE 4 BYTES (INTEIRO) PARA O REGISTRADOR REFERENTE AO ARGUMENTO
                 if (i == 0)
-                    codigo[ind++] = 0xbf; // edi
+                    codigo[ind++] = 0xbf; // %edi
                 else if (i == 1)
-                    codigo[ind++] = 0xbe; // esi
+                    codigo[ind++] = 0xbe; // %esi
                 else if (i == 2)
-                    codigo[ind++] = 0xba; // edx
+                    codigo[ind++] = 0xba; // %edx
 
                 memcpy(&codigo[ind], &params[i].valor.v_int, sizeof(int));
                 ind += sizeof(int);
-                // copia bem sucedida
-
                 break;
+
             case IND:
-                // o que eu movo aqui é o valor do ponteiro para r9 e depois (r9) para o respectivo reg
-                int *endereco = (int *)params[i].valor.v_ptr;
+                int *end_int = (int *)params[i].valor.v_ptr;
                 if (i == 0){
-                    // vou mover esse endereço para r9 se for o primeiro param
-                    codigo[ind++] = 0x49;
-                    codigo[ind++] = 0xb9;
-                    memcpy(&codigo[ind], &endereco, sizeof(int *));
-                    ind += sizeof(int *);
-                    codigo[ind++] = 0x41;
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR de 1º ARGUMENTO (%rdi)
+                    end2reg(codigo, &ind, mov2rdi, &end_int);
+                    // mov (%rdi), %edi
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x39;
+                    codigo[ind++] = 0x3f;
                 }
                 else if (i == 1){
-                    // vou mover esse endereço para r10 se for o segundo param
-                    codigo[ind++] = 0x49;
-                    codigo[ind++] = 0xba;
-                    memcpy(&codigo[ind], &endereco, sizeof(int *));
-                    ind += sizeof(int *);
-                    codigo[ind++] = 0x41;
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR 2º ARGUMENTO (%rsi)
+                    end2reg(codigo, &ind, mov2rsi, &end_int);
+                    // mov (%rsi), %esi
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x32;
+                    codigo[ind++] = 0x36;
                 }
                 else if (i == 2){
-                    // vou mover esse endereco para r11 se for o terceiro param
-                    codigo[ind++] = 0x49;
-                    codigo[ind++] = 0xbb;
-                    memcpy(&codigo[ind], &endereco, sizeof(int *));
-                    ind += sizeof(int *);
-                    codigo[ind++] = 0x41;
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR 3º ARGUMENTO (%rdx)
+                    end2reg(codigo, &ind, mov2rdx, &end_int);
+                    // mov (%rdx), %edx
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x13;
+                    codigo[ind++] = 0x12;
                 }
                 break;
             }
             break;
 
         case PTR_PAR:
+
             switch (params[i].orig_val){
             case PARAM:
-                // TODO
-                // já era aqui :)
-                continue;
+            // CASO TRATADO NO PRIMEIRO FOR DA FUNÇÃO
                 break;
 
             case FIX:
+            // PASSA A CONSTANTE DE 8 BYTES (PONTEIRO) PARA O REGISTRADOR REFERENTE AO ARGUMENTO 
                 if (i == 0){
-                    codigo[ind++] = 0x48;
-                    codigo[ind++] = 0xbf; // rdi
+                    end2reg(codigo, &ind, mov2rdi, &params[i].valor.v_ptr); // %rdi
                 }
                 else if (i == 1){
-                    codigo[ind++] = 0x48;
-                    codigo[ind++] = 0xbe; // rsi
+                    end2reg(codigo, &ind, mov2rsi, &params[i].valor.v_ptr); // %rsi
                 }
                 else if (i == 2){
-                    codigo[ind++] = 0x48;
-                    codigo[ind++] = 0xba; // rdx
+                    end2reg(codigo, &ind, mov2rdx, &params[i].valor.v_ptr); // %rdx
                 }
-                memcpy(&codigo[ind], &params[i].valor.v_ptr, sizeof(void *));
-                printf("Endereço recebido em cria_func: %p\n", params[i].valor.v_ptr);
-                ind += sizeof(void *);
                 break;
 
             case IND:
-                void* endereco = params[i].valor.v_ptr;
+                void* end_ptr = params[i].valor.v_ptr;
                 if (i == 0){
-                    // move para r9 e desreferencia em rdi
-                    codigo[ind++] = 0x49;
-                    codigo [ind++] = 0xb9;
-                    memcpy(&codigo[ind], &endereco, sizeof(void*));
-                    ind += sizeof(void*);
-                    codigo[ind++] = 0x49;
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR 1º ARGUMENTO (%rdi)
+                    end2reg(codigo, &ind, mov2rdi, &end_ptr);
+                    // mov (%rdi), %rdi
+                    codigo[ind++] = 0x48;
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x39;
+                    codigo[ind++] = 0x3f;
                 }
-                else if (i == 2){
-                    // move para r10 e desreferencia em rsi
-                    codigo[ind++] = 0x49;
-                    codigo [ind++] = 0xba;
-                    memcpy(&codigo[ind], &endereco, sizeof(void*));
-                    ind += sizeof(void*);
-                    codigo[ind++] = 0x49;
+                else if (i == 1){
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR 2º ARGUMENTO (%rsi)
+                    end2reg(codigo, &ind, mov2rsi, &end_ptr);
+                    // mov (%rsi), %rsi
+                    codigo[ind++] = 0x48;
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x32;
+                    codigo[ind++] = 0x36;
                 }
-                else{
-                    // move para r11 e desreferencia em rdx
-                    codigo[ind++] = 0x49;
-                    codigo [ind++] = 0xbb;
-                    memcpy(&codigo[ind], &endereco, sizeof(void*));
-                    ind += sizeof(void*);
-                    codigo[ind++] = 0x49;
+                else if (i==2) {
+                    // PASSA O ENDEREÇO DO PONTEIRO QUE APONTA PARA A VARIÁVEL PARA O REGISTRADOR 3º ARGUMENTO (%rdx)
+                    end2reg(codigo, &ind, mov2rdx, &end_ptr);
+                    // mov (%rdx), %rdx
+                    codigo[ind++] = 0x48;
                     codigo[ind++] = 0x8b;
-                    codigo[ind++] = 0x13;
+                    codigo[ind++] = 0x12;
                 }
                 break;
             }

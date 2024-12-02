@@ -1,4 +1,11 @@
 Gabriel Martins Mendes - 2311271 - Turma 3WC
 Leo Klinger Svartman - 2310862 - Turma 3WC
 
-Nós realizamos todos os testes disponibilizados no site e todos funcionaram corretamente. Além disso, executamos outros três testes 
+Nós realizamos todos os testes disponibilizados no site. 
+Foram executamos outros testes seguindo o modelo do terceiro teste do site, referente à comparação de strings, porém alterando as strings 
+comparadas e o tamanho da parte das strings a serem comparadas, além da forma que os argumentos eram utilizados na função.
+Também fizemos testes onde eram retornados um parâmetro inteiro e outros onde eram retornados um parâmetro ponteiro, alterando a forma que 
+os argumentos eram utilizados na função.
+Realizamos, também, outros testes com multiplicação de inteiros.
+
+Todos funcionaram corretamente.

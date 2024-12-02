@@ -52,13 +52,14 @@ void cria_func(void *f, DescParam params[], int n, unsigned char codigo[]){
     end2reg(codigo, &ind, mov2rax, &f);
 
     // ALINHAMENTO DOS PARAMs PARA OS REGISTRADORES CERTOS 
-    int numPARAM = 0;
+    int numPARAMs = 0;
     for (int i = 0; i < n; i++){
-        if (params[i].orig_val == PARAM)
-            numPARAM++;
+        if (params[i].orig_val == PARAM){
+            numPARAMs++;
+        }
     }
 
-    if (numPARAM != n){
+    if (numPARAMs != n){
         if (n == 2){
             if (params[0].orig_val != PARAM){
                 // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 2º ARGUMENTO
@@ -67,7 +68,7 @@ void cria_func(void *f, DescParam params[], int n, unsigned char codigo[]){
         }
 
         if (n == 3){
-            if(numPARAM == 1){
+            if(numPARAMs == 1){
                 if (params[0].orig_val != PARAM){
                     if (params[1].orig_val == PARAM){
                         // MOVER DO REGISTRADOR DE 1º ARGUMENTO PARA O DE 2º ARGUMENTO
